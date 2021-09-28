@@ -33,33 +33,29 @@ public class MethodCallHandlerImpl implements MethodCallHandler {
     if ("getNotificationPermissionStatus".equalsIgnoreCase(call.method)) {
       result.success(getNotificationPermissionStatus());
     } else if ("requestNotificationPermissions".equalsIgnoreCase(call.method)) {
+      final Activity activity = this.activity;
+      if (activity == null) {
+        result.error(call.method, "context is not instance of Activity", null);
+        return;
+      }
+      // https://stackoverflow.com/a/45192258
+      final Intent intent = new Intent();
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        // ACTION_APP_NOTIFICATION_SETTINGS was introduced in API level 26 aka Android O
+        intent.setAction(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+        intent.putExtra(Settings.EXTRA_APP_PACKAGE, activity.getPackageName());
+      } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
+        intent.putExtra("app_package", activity.getPackageName());
+        intent.putExtra("app_uid", activity.getApplicationInfo().uid);
+      } else {
+        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        intent.addCategory(Intent.CATEGORY_DEFAULT);
+        intent.setData(Uri.parse("package:" + activity.getPackageName()));
+      }
+      activity.startActivity(intent);
+
       if (PERMISSION_DENIED.equalsIgnoreCase(getNotificationPermissionStatus())) {
-        final Activity activity = this.activity;
-
-        if (activity == null) {
-          result.error(call.method, "context is not instance of Activity", null);
-          return;
-        }
-
-        // https://stackoverflow.com/a/45192258
-        final Intent intent = new Intent();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          // ACTION_APP_NOTIFICATION_SETTINGS was introduced in API level 26 aka Android O
-          intent.setAction(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
-          intent.putExtra(Settings.EXTRA_APP_PACKAGE, activity.getPackageName());
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-          intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS");
-          intent.putExtra("app_package", activity.getPackageName());
-          intent.putExtra("app_uid", activity.getApplicationInfo().uid);
-        } else {
-          intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-          intent.addCategory(Intent.CATEGORY_DEFAULT);
-          intent.setData(Uri.parse("package:" + activity.getPackageName()));
-        }
-
-        activity.startActivity(intent);
-
         result.success(PERMISSION_DENIED);
       } else {
         result.success(PERMISSION_GRANTED);
